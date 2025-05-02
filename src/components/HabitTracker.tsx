@@ -14,6 +14,7 @@ type Habit = {
   frequency: string;
   progress: number;
   streak: number;
+  lastUpdated?: string | null;
   history: { date: string; value: number }[];
   color: string;
 };
@@ -195,45 +196,72 @@ const App = () => {
   };
 
   // Function to update habit progress
-  const updateHabitProgress = (habitId: string, newProgress: number) => {
-    setHabits(prevHabits => 
-      prevHabits.map(habit => 
-        habit.id === habitId 
-          ? { 
-              ...habit, 
-              progress: newProgress,
-              streak: newProgress >= habit.target ? habit.streak + 1 : 0,
-              history: [
-                ...habit.history.slice(0, -1),
-                { ...habit.history[habit.history.length - 1], value: newProgress }
-              ]
-            } 
-          : habit
-      )
-    );
-    
-    const habitName = habits.find(h => h.id === habitId)?.name;
-    showToast(`Updated ${habitName} progress!`);
-  };
+// Function to update habit progress
+const updateHabitProgress = (habitId: string, newProgress: number) => {
+  const today = new Date().toISOString().split('T')[0];
+  
+  setHabits(prevHabits => 
+    prevHabits.map(habit => {
+      if (habit.id === habitId) {
+        // Get the current habit
+        const wasCompleted = habit.progress >= habit.target;
+        const isNowCompleted = newProgress >= habit.target;
+        
+        // Calculate streak - only increment if:
+        // 1. The habit wasn't already completed today (prevent multiple increments)
+        // 2. The habit is now completed
+        // 3. The habit was either completed yesterday or this is a new streak
+        let newStreak = habit.streak;
+        
+        // If the habit is now completed AND wasn't already completed today
+        if (isNowCompleted && (!wasCompleted || habit.lastUpdated !== today)) {
+          newStreak = habit.streak + 1;
+        } 
+        // If the habit is not completed (and we're resetting progress), reset streak
+        else if (newProgress === 0) {
+          newStreak = 0;
+        }
+        // If just decreasing but still complete, maintain streak
+        
+        return { 
+          ...habit, 
+          progress: newProgress,
+          streak: newStreak,
+          lastUpdated: today,
+          history: [
+            ...habit.history.slice(0, -1),
+            { ...habit.history[habit.history.length - 1], value: newProgress }
+          ]
+        };
+      }
+      return habit;
+    })
+  );
+  
+  const habitName = habits.find(h => h.id === habitId)?.name;
+  showToast(`Updated ${habitName} progress!`);
+};
 
   // Function to add a new habit
-  const addNewHabit = (newHabit: Omit<Habit, 'id' | 'history' | 'streak' | 'progress'>) => {
-    const id = (habits.length + 1).toString();
-    const newHabitComplete: Habit = {
-      ...newHabit,
-      id,
-      progress: 0,
-      streak: 0,
-      history: Array(30).fill(0).map((_, i) => ({ 
-        date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        value: Math.random() * newHabit.target
-      })),
-    };
-    
-    setHabits(prev => [...prev, newHabitComplete]);
-    setIsNewHabitModalOpen(false);
-    showToast(`Added new habit: ${newHabit.name}`);
+// Function to add a new habit
+const addNewHabit = (newHabit: Omit<Habit, 'id' | 'history' | 'streak' | 'progress' | 'lastUpdated'>) => {
+  const id = (habits.length + 1).toString();
+  const newHabitComplete: Habit = {
+    ...newHabit,
+    id,
+    progress: 0,
+    streak: 0,
+    lastUpdated: null,
+    history: Array(30).fill(0).map((_, i) => ({ 
+      date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      value: Math.random() * newHabit.target
+    })),
   };
+  
+  setHabits(prev => [...prev, newHabitComplete]);
+  setIsNewHabitModalOpen(false);
+  showToast(`Added new habit: ${newHabit.name}`);
+};
 
   // Function to delete a habit
   const deleteHabit = (habitId: string) => {
@@ -654,15 +682,21 @@ filteredHabits.map(habit => (
           </svg>
         </motion.button>
         <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          className={`inline-flex items-center p-1.5 border border-transparent rounded-full shadow-sm text-white ${habit.progress >= habit.target ? 'bg-green-500 hover:bg-green-600' : 'bg-green-600 hover:bg-green-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
-          onClick={() => updateHabitProgress(habit.id, habit.target)}
-        >
-          <svg className="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-          </svg>
-        </motion.button>
+  whileHover={{ scale: 1.1 }}
+  whileTap={{ scale: 0.9 }}
+  className={`inline-flex items-center p-1.5 border border-transparent rounded-full shadow-sm text-white ${habit.progress >= habit.target ? 'bg-green-500 hover:bg-green-600' : 'bg-green-600 hover:bg-green-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
+  onClick={() => {
+    const today = new Date().toISOString().split('T')[0];
+    // Only mark complete if not already completed today
+    if (!(habit.progress >= habit.target && habit.lastUpdated === today)) {
+      updateHabitProgress(habit.id, habit.target);
+    }
+  }}
+>
+  <svg className="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+  </svg>
+</motion.button>
       </div>
     </div>
   </motion.div>
@@ -943,19 +977,23 @@ initial={{ opacity: 0 }}
 animate={{ opacity: 1 }}
 exit={{ opacity: 0 }}
 className="fixed z-10 inset-0 overflow-y-auto"
+onClick={(e) => {
+  if (e.target === e.currentTarget) {
+    setIsSettingsOpen(false);
+  }
+}}
 >
-<div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-              <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+<div className="flex items-center justify-center min-h-screen p-">
+              <div className="fixed inset-0 bg-black bg-opacity-30" aria-hidden="true">
                 <div className={`absolute inset-0 ${isDarkMode ? 'bg-gray-900' : 'bg-gray-500'} opacity-75`}></div>
               </div>
-
-              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
-                className={`inline-block align-bottom rounded-xl px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6 ${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'}`}
+                className={`relative rounded-xl p-6 w-full max-w-lg mx-auto shadow-xl transform ${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'}`}
+                onClick={(e) => e.stopPropagation()}
               >
                 <div>
                   <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
