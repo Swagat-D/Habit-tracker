@@ -27,6 +27,16 @@ type User = {
   longestStreak: number;
 };
 
+type Reminder = {
+  id: string;
+  habitId: string | null;
+  icon: string;
+  title: string;
+  message: string;
+  type: 'warning' | 'info' | 'success';
+  dismissed: boolean;
+};
+
 type WeeklySummary = {
   day: string;
   sleep: number;
@@ -66,7 +76,7 @@ const generateHabits = (): Habit[] => {
       target: 8,
       unit: 'hours',
       frequency: 'daily',
-      progress: 7.5,
+      progress: 7,
       streak: 5,
       history: Array(30).fill(0).map((_, i) => ({ 
         date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -153,6 +163,17 @@ const generateHabits = (): Habit[] => {
 };
 
 const App = () => {
+  // Function to dismiss a reminder
+  const dismissReminder = (reminderId: string) => {
+    setReminders(prevReminders => 
+      prevReminders.map(reminder => 
+        reminder.id === reminderId 
+          ? { ...reminder, dismissed: true } 
+          : reminder
+      )
+    );
+    showToast('Reminder dismissed');
+  };
   // State
   const [user, setUser] = useState<User>({
     name: 'Swagat Kumar Dash',
@@ -175,9 +196,14 @@ const App = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [reminders, setReminders] = useState<Reminder[]>([]);
 
   // Effect to show today's date
   const [currentDate, setCurrentDate] = useState<string>('');
+
+  useEffect(() => {
+      generateReminder();
+    }, [habits]);
   
   useEffect(() => {
     const now = new Date();
@@ -199,6 +225,7 @@ const App = () => {
 // Function to update habit progress
 const updateHabitProgress = (habitId: string, newProgress: number) => {
   const today = new Date().toISOString().split('T')[0];
+  const currentHabit = habits.find(h => h.id === habitId);
   
   setHabits(prevHabits => 
     prevHabits.map(habit => {
@@ -237,10 +264,105 @@ const updateHabitProgress = (habitId: string, newProgress: number) => {
       return habit;
     })
   );
+
+  // Handle reminders based on progress update
+  updateRemindersAfterHabitProgress(habitId, newProgress, currentHabit);
   
   const habitName = habits.find(h => h.id === habitId)?.name;
   showToast(`Updated ${habitName} progress!`);
 };
+
+// Function to update reminders after habit progress change
+const updateRemindersAfterHabitProgress = (habitId: string, newProgress: number, habit: Habit | undefined) => {
+  if (!habit) return;
+  
+  // Auto-dismiss reminders based on progress
+  setReminders(prevReminders => {
+    return prevReminders.map(reminder => {
+      // If reminder is related to this habit
+      if (reminder.habitId === habitId) {
+        // Water reminder - dismiss if we've met the target
+        if (habit.name === 'Water' && newProgress >= habit.target && reminder.title === 'Drink more water') {
+          return { ...reminder, dismissed: true };
+        }
+        
+        // Screen time reminder - dismiss if we're below target 
+        if (habit.name === 'Screen Time' && newProgress <= habit.target && reminder.title === 'Screen time goal exceeded') {
+          return { ...reminder, dismissed: true };
+        }
+        
+        // Exercise reminder - dismiss if we've started exercising
+        if (habit.name === 'Exercise' && newProgress > 0 && reminder.title === 'Exercise reminder') {
+          return { ...reminder, dismissed: true };
+        }
+      }
+      return reminder;
+    });
+  });
+  
+  // Re-generate reminders to ensure up-to-date status
+  setTimeout(() => generateReminder(), 100);
+};
+
+const generateReminder = () => {
+  const newReminders: Reminder[] = [];
+  
+  // Check for habits that are over target (like screen time)
+  habits.forEach(habit => {
+    if (habit.name === 'Screen Time' && habit.progress > habit.target) {
+      newReminders.push({
+        id: `over-${habit.id}`,
+        habitId: habit.id,
+        icon: habit.icon,
+        title: `${habit.name} goal exceeded`,
+        message: `You're ${habit.progress - habit.target} ${habit.unit} over your goal`,
+        type: 'warning',
+        dismissed: false
+      });
+    }
+    
+    // Check for habits that need attention (low completion)
+    if (habit.name === 'Water' && habit.progress < habit.target) {
+      newReminders.push({
+        id: `under-${habit.id}`,
+        habitId: habit.id,
+        icon: habit.icon,
+        title: `Drink more water`,
+        message: `${habit.target - habit.progress} more glasses needed today`,
+        type: 'info',
+        dismissed: false
+      });
+    }
+    
+    // Check for exercise streak potential reminders
+    if (habit.name === 'Exercise' && habit.streak === 0) {
+      newReminders.push({
+        id: `streak-${habit.id}`,
+        habitId: habit.id,
+        icon: habit.icon,
+        title: `Exercise reminder`,
+        message: `You haven't exercised in 2 days`,
+        type: 'success',
+        dismissed: false
+      });
+    }
+  });
+  
+  // Filter out dismissed reminders
+  const activePreviousReminders = reminders.filter(r => !r.dismissed);
+  
+  // Merge with existing non-dismissed reminders, avoiding duplicates
+  const mergedReminders = [...activePreviousReminders];
+  
+  newReminders.forEach(newReminder => {
+    if (!mergedReminders.some(r => r.id === newReminder.id)) {
+      mergedReminders.push(newReminder);
+    }
+  });
+  
+  setReminders(mergedReminders);
+};
+
 
   // Function to add a new habit
 // Function to add a new habit
@@ -718,24 +840,69 @@ className={`rounded-2xl shadow-sm p-6 ${isDarkMode ? 'bg-gray-800' : 'bg-white'}
 Priority Reminders
 </h3>
 <div className="space-y-3">
-<motion.div 
-whileHover={{ scale: 1.02, x: 5 }}
-transition={{ type: 'spring', stiffness: 400, damping: 10 }}
-className="flex justify-between items-center p-3 rounded-xl bg-amber-50 dark:bg-amber-900/30 border border-amber-100 dark:border-amber-800"
->
-<div className="flex items-center">
-  <div className="flex-shrink-0 text-amber-500 dark:text-amber-400 text-xl">⚠️</div>
-  <div className="ml-3">
-    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Screen time goal exceeded</p>
-    <p className="text-xs text-amber-700 dark:text-amber-400">You&#39;re 60 minutes over your goal</p>
-  </div>
+{reminders.length === 0 ? (
+<div className={`text-center py-6 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+  <p className='text-sm'>No active reminders right now.</p>
+  <p className='text-xs mt-1'>Great Job staying on track.</p>
 </div>
-<button className="p-1 rounded-full text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300">
-  <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-  </svg>
-</button>
-</motion.div>
+) : (
+  reminders.filter(reminder => !reminder.dismissed).map(reminder => (
+    <motion.div 
+      key={reminder.id} 
+      whileHover={{ scale: 1.02, x: 5 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 10 }}
+      className={`flex justify-between items-center p-3 rounded-xl ${
+        reminder.type === 'warning' 
+          ? 'bg-amber-50 dark:bg-amber-900/30 border border-amber-100 dark:border-amber-800' 
+          : reminder.type === 'info'
+            ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800'
+            : 'bg-green-50 dark:bg-green-900/30 border border-green-100 dark:border-green-800'
+      }`}
+    >
+      <div className="flex items-center">
+        <div className={`flex-shrink-0 text-xl ${
+          reminder.type === 'warning' 
+            ? 'text-amber-500 dark:text-amber-400'
+            : reminder.type === 'info'
+              ? 'text-blue-500 dark:text-blue-400'
+              : 'text-green-500 dark:text-green-400'
+        }`}>{reminder.icon}</div>
+      <div className="ml-3">
+          <p className={`text-sm font-medium ${
+            reminder.type === 'warning' 
+              ? 'text-amber-800 dark:text-amber-300'
+              : reminder.type === 'info'
+                ? 'text-blue-800 dark:text-blue-300'
+                : 'text-green-800 dark:text-green-300'
+          }`}>{reminder.title}</p>
+          <p className={`text-xs ${
+            reminder.type === 'warning' 
+              ? 'text-amber-700 dark:text-amber-400'
+              : reminder.type === 'info'
+                ? 'text-blue-700 dark:text-blue-400'
+                : 'text-green-700 dark:text-green-400'
+          }`}>{reminder.message}</p>
+          </div>
+        </div>
+        <button
+          className={`p-1 rounded-full ${
+            reminder.type === 'warning' 
+              ? 'text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300'
+              : reminder.type === 'info'
+                ? 'text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300'
+                : 'text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300'
+          }`}
+          onClick={() => dismissReminder(reminder.id)}
+        >
+          <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+        </svg>
+      </button>
+    </motion.div>
+  ))
+)}
+    </div>
+    </motion.div>
 
 <motion.div 
 whileHover={{ scale: 1.02, x: 5 }}
@@ -773,8 +940,6 @@ className="flex justify-between items-center p-3 rounded-xl bg-green-50 dark:bg-
     <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
   </svg>
 </button>
-</motion.div>
-</div>
 </motion.div>
 </div>
 
