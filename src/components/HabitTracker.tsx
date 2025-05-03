@@ -81,7 +81,7 @@ type Reminder = {
 type WeeklySummary = {
   day: string
   sleep: number
-  water: number
+  Water: number
   exercise: number
   meditation: number
   reading: number
@@ -101,7 +101,7 @@ const generateWeeklyData = (): WeeklySummary[] => {
   return days.map((day) => ({
     day,
     sleep: 5 + Math.random() * 4,
-    water: 1 + Math.random() * 7,
+    Water: 1 + Math.random() * 7,
     exercise: Math.random() * 60,
     meditation: Math.random() * 30,
     reading: Math.random() * 120,
@@ -273,7 +273,7 @@ const [newHabitForm, setNewHabitForm] = useState({
   const [currentDate, setCurrentDate] = useState<string>("")
 
   useEffect(() => {
-    generateReminder()
+    updateRemindersBasedOnHabits(habits);
   }, [habits])
 
   useEffect(() => {
@@ -313,31 +313,22 @@ const [newHabitForm, setNewHabitForm] = useState({
   // Function to update habit progress
   const updateHabitProgress = (habitId: string, newProgress: number) => {
     const today = new Date().toISOString().split("T")[0]
-    const currentHabit = habits.find((h) => h.id === habitId)
-
-    setHabits((prevHabits) =>
-      prevHabits.map((habit) => {
+  
+    setHabits((prevHabits) => {
+      const updatedHabits = prevHabits.map((habit) => {
         if (habit.id === habitId) {
-          // Get the current habit
+          // Existing code for habit update calculation
           const wasCompleted = habit.progress >= habit.target
           const isNowCompleted = newProgress >= habit.target
-
-          // Calculate streak - only increment if:
-          // 1. The habit wasn't already completed today (prevent multiple increments)
-          // 2. The habit is now completed
-          // 3. The habit was either completed yesterday or this is a new streak
           let newStreak = habit.streak
-
-          // If the habit is now completed AND wasn't already completed today
+  
           if (isNowCompleted && (!wasCompleted || habit.lastUpdated !== today)) {
             newStreak = habit.streak + 1
           }
-          // If the habit is not completed (and we're resetting progress), reset streak
           else if (newProgress === 0) {
             newStreak = 0
           }
-          // If just decreasing but still complete, maintain streak
-
+  
           return {
             ...habit,
             progress: newProgress,
@@ -350,141 +341,73 @@ const [newHabitForm, setNewHabitForm] = useState({
           }
         }
         return habit
-      })
-    )
-
-    // Handle reminders based on progress update
-    updateRemindersAfterHabitProgress(habitId, newProgress, currentHabit)
-
-    // Regenerate reminders immediately to update reminder text
-    generateReminder()
-
+      });
+      
+      // Process reminders immediately after updating habits, but before the state update completes
+      setTimeout(() => {
+        updateRemindersBasedOnHabits(updatedHabits);
+      }, 0);
+      
+      return updatedHabits;
+    });
+  
     const habitName = habits.find((h) => h.id === habitId)?.name
     showToast(`Updated ${habitName} progress!`)
   }
 
   // Function to update reminders after habit progress change
-  const updateRemindersAfterHabitProgress = (habitId: string, newProgress: number, habit: Habit | undefined) => {
-    if (!habit) return
-
-    // Auto-dismiss reminders based on progress
-    setReminders((prevReminders) => {
-      return prevReminders.map((reminder) => {
-        // If reminder is related to this habit
-        if (reminder.habitId === habitId) {
-          // Water reminder - dismiss if we've met the target
-          if (habit.name === "Water" && newProgress >= habit.target && reminder.title === "Drink more water") {
-            return { ...reminder, dismissed: true }
-          }
-
-          // Water reminder - update message if target not met
-          if (habit.name === "Water" && newProgress < habit.target && reminder.title === "Drink more water") {
-            const remaining = habit.target - newProgress
-            const glassText = remaining === 1 ? "glass" : "glasses" // Make text grammatically correct
-            return {
-              ...reminder,
-              message: `${remaining} more ${glassText} needed today`,
-            }
-          }
-
-          // Screen time reminder - dismiss if we're below target
-          if (
-            habit.name === "Screen Time" &&
-            newProgress <= habit.target &&
-            reminder.title === "Screen time goal exceeded"
-          ) {
-            return { ...reminder, dismissed: true }
-          }
-
-          if (
-            habit.name === "Screen Time" &&
-            newProgress > habit.target &&
-            reminder.title === "Screen time goal exceeded"
-          ) {
-            return {
-              ...reminder,
-              message: `You're ${newProgress - habit.target} ${habit.unit} over your goal`,
-            }
-          }
-
-          // Exercise reminder - dismiss if we've started exercising
-          if (habit.name === "Exercise" && newProgress > 0 && reminder.title === "Exercise reminder") {
-            return { ...reminder, dismissed: true }
-          }
-        }
-        return reminder
-      })
-    })
-
-    // Re-generate reminders to ensure up-to-date status
-    setTimeout(() => generateReminder(), 100)
-  }
-
-  const generateReminder = () => {
-    const newReminders: Reminder[] = []
-
-    // Check for habits that are over target (like screen time)
-    habits.forEach((habit) => {
-      if (habit.name === "Screen Time" && habit.progress > habit.target) {
-        newReminders.push({
-          id: `over-${habit.id}`,
-          habitId: habit.id,
-          icon: habit.icon,
-          title: `${habit.name} goal exceeded`,
-          message: `You're ${habit.progress - habit.target} ${habit.unit} over your goal`,
-          type: "warning",
-          dismissed: false,
-        })
-      }
-
-      // Check for habits that need attention (low completion)
-      if (habit.name === "Water" && habit.progress < habit.target) {
-        const remaining = habit.target - habit.progress
-        const glassText = remaining === 1 ? "glass" : "glasses" // Make text grammatically correct
-        newReminders.push({
-          id: `under-${habit.id}`,
-          habitId: habit.id,
-          icon: habit.icon,
-          title: `Drink more water`,
-          message: `${remaining} more ${glassText} needed today`,
-          type: "info",
-          dismissed: false,
-        })
-      }
-
-      // Check for exercise streak potential reminders
-      if (habit.name === "Exercise" && habit.streak === 0) {
-        newReminders.push({
-          id: `streak-${habit.id}`,
-          habitId: habit.id,
-          icon: habit.icon,
-          title: `Exercise reminder`,
-          message: `You haven't exercised in 2 days`,
-          type: "success",
-          dismissed: false,
-        })
-      }
-    })
-
-    // Filter out dismissed reminders
-    const activePreviousReminders = reminders.filter((r) => !r.dismissed)
-
-    // Merge with existing non-dismissed reminders, avoiding duplicates
-    const mergedReminders = [...activePreviousReminders]
-
-    newReminders.forEach((newReminder) => {
-      const existingReminderIndex = mergedReminders.findIndex((r) => r.id === newReminder.id)
-      if (existingReminderIndex !== -1) {
-        // Update the existing reminder's message
-        mergedReminders[existingReminderIndex].message = newReminder.message
-      } else {
-        // Add the new reminder
-        mergedReminders.push(newReminder)
-      }
-    })
-
-    setReminders(mergedReminders)
-  }
+  // Add this new function to replace both existing reminder functions
+const updateRemindersBasedOnHabits = (currentHabits: Habit[]) => {
+  // Start with a fresh array for new reminders
+  const newReminders: Reminder[] = [];
+  
+  // Process each habit and generate appropriate reminders
+  currentHabits.forEach((habit) => {
+    // Screen time reminders - only if over target
+    if (habit.name === "Screen Time" && habit.progress > habit.target) {
+      newReminders.push({
+        id: `over-${habit.id}`,
+        habitId: habit.id,
+        icon: habit.icon,
+        title: `${habit.name} goal exceeded`,
+        message: `You're ${habit.progress - habit.target} ${habit.unit} over your goal`,
+        type: "warning",
+        dismissed: false,
+      });
+    }
+    
+    // Water reminders - only if under target
+if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(habit.target.toString())) {
+  const remaining = habit.target - habit.progress;
+  const glassText = remaining === 1 ? "glass" : "glasses";
+  newReminders.push({
+    id: `under-${habit.id}`,
+    habitId: habit.id,
+    icon: habit.icon,
+    title: `Drink more water`,
+    message: `${remaining} more ${glassText} needed today`,
+    type: "info",
+    dismissed: false,
+  });
+}
+    
+    // Exercise streak reminders - only if streak is 0
+    if (habit.name === "Exercise" && habit.streak === 0) {
+      newReminders.push({
+        id: `streak-${habit.id}`,
+        habitId: habit.id,
+        icon: habit.icon,
+        title: `Exercise reminder`,
+        message: `You haven't exercised in 2 days`,
+        type: "success",
+        dismissed: false,
+      });
+    }
+  });
+  
+  // Replace all reminders with the new set
+  setReminders(newReminders);
+}
 
   // Function to add a new habit
   const addNewHabit = (newHabit: Omit<Habit, "id" | "history" | "streak" | "progress" | "lastUpdated">) => {
@@ -502,8 +425,14 @@ const [newHabitForm, setNewHabitForm] = useState({
           value: Math.random() * newHabit.target,
         })),
     }
-
-    setHabits((prev) => [...prev, newHabitComplete])
+  
+    setHabits((prev) => {
+      const updatedHabits = [...prev, newHabitComplete];
+      // Update reminders based on new habit collection
+      setTimeout(() => updateRemindersBasedOnHabits(updatedHabits), 0);
+      return updatedHabits;
+    });
+    
     setIsNewHabitModalOpen(false)
     showToast(`Added new habit: ${newHabit.name}`)
   }
@@ -511,7 +440,18 @@ const [newHabitForm, setNewHabitForm] = useState({
   // Function to delete a habit
   const deleteHabit = (habitId: string) => {
     const habitName = habits.find((h) => h.id === habitId)?.name
-    setHabits(habits.filter((habit) => habit.id !== habitId))
+    
+    setHabits((prevHabits) => {
+      const updatedHabits = prevHabits.filter((habit) => habit.id !== habitId);
+      // Clean up reminders related to this habit
+      setReminders((prevReminders) => 
+        prevReminders.filter((reminder) => reminder.habitId !== habitId)
+      );
+      // Update reminders
+      setTimeout(() => updateRemindersBasedOnHabits(updatedHabits), 0);
+      return updatedHabits;
+    });
+    
     setIsHabitDetailOpen(false)
     showToast(`Deleted habit: ${habitName}`)
   }
@@ -849,7 +789,7 @@ const [newHabitForm, setNewHabitForm] = useState({
                   value={selectedHabit}
                   onChange={(e) => setSelectedHabit(e.target.value)}
                 >
-                  <option value="all">All Habits</option>
+                  <option value="all">All Habits Graph</option>
                   {habits.map((habit) => (
                     <option key={habit.id} value={habit.id}>
                       {habit.name}
@@ -1394,7 +1334,7 @@ const [newHabitForm, setNewHabitForm] = useState({
                         />
                       ) : null}
                       {selectedHabit === "all" || selectedHabit === "2" ? (
-                        <Line type="monotone" dataKey="water" stroke="#38BDF8" name="Water (glasses)" strokeWidth={2} />
+                        <Line type="monotone" dataKey="Water" stroke="#38BDF8" name="Water (glasses)" strokeWidth={2} />
                       ) : null}
                       {selectedHabit === "all" || selectedHabit === "3" ? (
                         <Line
