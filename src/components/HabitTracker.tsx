@@ -241,6 +241,16 @@ const App = () => {
     longestStreak: 21,
   })
 
+  // Add this new state right after other useState declarations
+const [newHabitForm, setNewHabitForm] = useState({
+  name: "",
+  icon: "🏃",
+  target: 1,
+  unit: "times",
+  frequency: "daily",
+  color: "#6366F1"
+});
+
   const [habits, setHabits] = useState<Habit[]>(generateHabits())
   const [weeklyData] = useState<WeeklySummary[]>(generateWeeklyData())
   const [selectedPeriod, setSelectedPeriod] = useState<string>("week")
@@ -1877,6 +1887,8 @@ const App = () => {
                       <input
                         type="text"
                         id="habit-name"
+                        value={newHabitForm.name}
+                        onChange={(e) => setNewHabitForm({...newHabitForm, name: e.target.value})}
                         className={`shadow-sm focus:ring-violet-500 focus:border-violet-500 block w-full sm:text-sm rounded-xl border ${
                           isDarkMode
                             ? "bg-gray-800 border-gray-700 text-white placeholder-gray-400"
@@ -1900,8 +1912,16 @@ const App = () => {
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
                             className={`w-10 h-10 flex items-center justify-center border rounded-lg ${
-                              isDarkMode ? "border-gray-700 hover:bg-gray-800" : "border-slate-200 hover:bg-gray-50"
+                              newHabitForm.icon === icon 
+                                ? `border-2 ${isDarkMode 
+                                    ? "border-violet-500 bg-violet-900/30" 
+                                    : "border-violet-500 bg-violet-100"
+                                  }`
+                                : isDarkMode 
+                                    ? "border-gray-700 hover:bg-gray-800" 
+                                    : "border-slate-200 hover:bg-gray-50"
                             }`}
+                            onClick={() => setNewHabitForm({...newHabitForm, icon: icon})}
                           >
                             {icon}
                           </motion.button>
@@ -1918,13 +1938,14 @@ const App = () => {
                           Daily Target
                         </label>
                         <input
-                          type="number"
                           id="habit-target"
+                          type="number"
+                          value={newHabitForm.target}
+                          onChange={(e) => setNewHabitForm({...newHabitForm, target: parseInt(e.target.value) || 1})}
                           className={`shadow-sm focus:ring-violet-500 focus:border-violet-500 block w-full sm:text-sm rounded-xl border ${
                             isDarkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-slate-200 text-gray-900"
                           }`}
                           min="1"
-                          defaultValue="1"
                         />
                       </div>
                       <div>
@@ -1935,18 +1956,20 @@ const App = () => {
                           Unit
                         </label>
                         <select
-                          id="habit-unit"
-                          className={`shadow-sm focus:ring-violet-500 focus:border-violet-500 block w-full sm:text-sm rounded-xl border ${
-                            isDarkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-slate-200 text-gray-900"
-                          }`}
-                        >
-                          <option>times</option>
-                          <option>minutes</option>
-                          <option>hours</option>
-                          <option>glasses</option>
-                          <option>pages</option>
-                          <option>steps</option>
-                        </select>
+  id="habit-unit"
+  value={newHabitForm.unit}
+  onChange={(e) => setNewHabitForm({...newHabitForm, unit: e.target.value})}
+  className={`shadow-sm focus:ring-violet-500 focus:border-violet-500 block w-full sm:text-sm rounded-xl border ${
+    isDarkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-slate-200 text-gray-900"
+  }`}
+>
+  <option>times</option>
+  <option>minutes</option>
+  <option>hours</option>
+  <option>glasses</option>
+  <option>pages</option>
+  <option>steps</option>
+</select>
                       </div>
                     </div>
 
@@ -1958,16 +1981,18 @@ const App = () => {
                         Frequency
                       </label>
                       <select
-                        id="habit-frequency"
-                        className={`shadow-sm focus:ring-violet-500 focus:border-violet-500 block w-full sm:text-sm rounded-xl border ${
-                          isDarkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-slate-200 text-gray-900"
-                        }`}
-                      >
-                        <option>daily</option>
-                        <option>weekdays</option>
-                        <option>weekends</option>
-                        <option>weekly</option>
-                      </select>
+  id="habit-frequency"
+  value={newHabitForm.frequency}
+  onChange={(e) => setNewHabitForm({...newHabitForm, frequency: e.target.value})}
+  className={`shadow-sm focus:ring-violet-500 focus:border-violet-500 block w-full sm:text-sm rounded-xl border ${
+    isDarkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-slate-200 text-gray-900"
+  }`}
+>
+  <option>daily</option>
+  <option>weekdays</option>
+  <option>weekends</option>
+  <option>weekly</option>
+</select>
                     </div>
 
                     <div>
@@ -1978,38 +2003,47 @@ const App = () => {
                         Color
                       </label>
                       <div className="flex space-x-3">
-                        {["#6366F1", "#38BDF8", "#FB923C", "#A855F7", "#14B8A6", "#F43F5E"].map((color) => (
-                          <motion.button
-                            key={color}
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            className="w-8 h-8 rounded-full hover:opacity-90 transition-opacity"
-                            style={{ backgroundColor: color }}
-                          ></motion.button>
-                        ))}
-                      </div>
+  {["#6366F1", "#38BDF8", "#FB923C", "#A855F7", "#14B8A6", "#F43F5E"].map((color) => (
+    <motion.button
+      key={color}
+      whileHover={{ scale: 1.1 }}
+      whileTap={{ scale: 0.9 }}
+      className={`w-8 h-8 rounded-full hover:opacity-90 transition-opacity ${
+        newHabitForm.color === color ? "ring-2 ring-offset-2 ring-gray-300 dark:ring-gray-700" : ""
+      }`}
+      style={{ backgroundColor: color }}
+      onClick={() => setNewHabitForm({...newHabitForm, color: color})}
+    ></motion.button>
+  ))}
+</div>
                     </div>
                   </div>
                 </div>
                 <div className="mt-6 sm:flex sm:flex-row-reverse">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    type="button"
-                    className="w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-600 text-base font-medium text-white hover:from-violet-600 hover:to-fuchsia-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500 sm:ml-3 sm:w-auto sm:text-sm"
-                    onClick={() => {
-                      addNewHabit({
-                        name: "Walking",
-                        icon: "🚶",
-                        target: 5000,
-                        unit: "steps",
-                        frequency: "daily",
-                        color: "#14B8A6",
-                      })
-                    }}
-                  >
-                    Create Habit
-                  </motion.button>
+                <motion.button
+  whileHover={{ scale: 1.05 }}
+  whileTap={{ scale: 0.95 }}
+  type="button"
+  className="w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-600 text-base font-medium text-white hover:from-violet-600 hover:to-fuchsia-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500 sm:ml-3 sm:w-auto sm:text-sm"
+  onClick={() => {
+    if (newHabitForm.name.trim() === "") {
+      showToast("Please enter a habit name");
+      return;
+    }
+    addNewHabit(newHabitForm);
+    // Reset form after creating habit
+    setNewHabitForm({
+      name: "",
+      icon: "🏃",
+      target: 1,
+      unit: "times",
+      frequency: "daily",
+      color: "#6366F1"
+    });
+  }}
+>
+  Create Habit
+</motion.button>
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
