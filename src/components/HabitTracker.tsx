@@ -17,33 +17,7 @@ import {
   PieChart,
   Pie,
 } from "recharts"
-import {
-  Activity,
-  BarChart3,
-  Bell,
-  BookOpen,
-  Calendar,
-  Download,
-  Droplets,
-  Edit3,
-  FileText,
-  Flame,
-  Home,
-  Lightbulb,
-  Loader2,
-  Menu,
-  Moon,
-  MoreHorizontal,
-  Plus,
-  Search,
-  Settings,
-  Smartphone,
-  Sun,
-  Target,
-  Trophy,
-  Users,
-  X,
-} from "lucide-react"
+import { Activity, BarChart3, Bell, BookOpen, Calendar, Download, Droplets, Edit3, FileText, Flame, Home, Lightbulb, Loader2, Menu, Moon, MoreHorizontal, Plus, Search, Settings, Smartphone, Sun, Target, Trophy, Users, X } from 'lucide-react'
 
 // Type definitions
 type Habit = {
@@ -266,7 +240,7 @@ const [newHabitForm, setNewHabitForm] = useState({
   const [activeTab, setActiveTab] = useState<string>("dashboard")
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false)
-  const sidebarRef = useRef<HTMLDivElement>(null)
+  const sidebarRef = useRef < HTMLDivElement > (null)
   const buttonRef = useRef<HTMLButtonElement>(null)
 
   // Effect to show today's date
@@ -302,6 +276,20 @@ const [newHabitForm, setNewHabitForm] = useState({
       document.removeEventListener("mousedown", handleClickOutside)
     }
   }, [isMobileMenuOpen])
+
+  // Add this new useEffect to ensure sidebar styling is consistent with theme:
+  useEffect(() => {
+    // This ensures the sidebar styling is consistent with the current theme
+    if (sidebarRef.current) {
+      if (isDarkMode) {
+        sidebarRef.current.classList.add("bg-gray-900", "text-white", "border-gray-800");
+        sidebarRef.current.classList.remove("bg-white", "text-gray-900", "border-slate-200");
+      } else {
+        sidebarRef.current.classList.add("bg-white", "text-gray-900", "border-slate-200");
+        sidebarRef.current.classList.remove("bg-gray-900", "text-white", "border-gray-800");
+      }
+    }
+  }, [isDarkMode, isMobileMenuOpen]);
 
   // Helper function to display toast
   const showToast = (message: string) => {
@@ -564,7 +552,7 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
         className={`fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         } ${
-          isDarkMode ? "bg-gray-900 border-gray-800" : "bg-white border-slate-200"
+          isDarkMode ? "bg-gray-900 border-gray-800 text-white" : "bg-white border-slate-200 text-gray-900"
         } border-r shadow-lg lg:shadow-none`}
       >
         <div className="flex h-full flex-col">
@@ -637,7 +625,7 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
 
             <div className="mt-10">
               <h3
-                className={`px-4 text-xs font-semibold uppercase tracking-wider ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}
+                className={`px-4 text-xs font-semibold uppercase tracking-wider ${isDarkMode ? "text-gray-500" : "text-gray-600"}`}
               >
                 My Habits
               </h3>
@@ -651,13 +639,13 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
                         ? `${
                             isDarkMode
                               ? "bg-gray-800 text-white border-gray-700"
-                              : "bg-gray-100 text-gray-900 border-gray-200"
+                              : "bg-gray-100 text-gray-900 border-gray-300"
                           }`
                         : `${
                             isDarkMode
                               ? "text-gray-400 hover:bg-gray-800 hover:text-white border-transparent"
                               : "text-gray-700 hover:bg-gray-100 hover:text-gray-900 border-transparent"
-                          }`
+                        }`
                     }`}
                   >
                     <div className="flex items-center">
@@ -682,7 +670,7 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
                   className={`flex items-center w-full px-4 py-2 mt-2 text-sm font-medium rounded-lg border ${
                     isDarkMode
                       ? "text-gray-400 hover:bg-gray-800 hover:text-white border-transparent"
-                      : "text-gray-700 hover:bg-gray-100 hover:text-gray-900 border-dashed border-gray-300"
+                      : "text-gray-700 hover:bg-gray-100 hover:text-gray-900 border-dashed border-gray-400"
                   }`}
                 >
                   <div className="flex items-center justify-center h-8 w-8 rounded-lg mr-3 bg-violet-100 dark:bg-violet-900/30">
@@ -705,7 +693,7 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
               />
               <div className="ml-3">
                 <p className="text-sm font-medium">{user.name.split(" ")[0]}</p>
-                <p className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
+                <p className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-600"}`}>
                   Member since{" "}
                   {new Date(user.joinedDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
                 </p>
@@ -725,9 +713,9 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
       <div className="lg:pl-64">
         {/* Top Navigation */}
         <header
-          className={`sticky top-0 z-40 ${
-            isDarkMode ? "bg-gray-900/80 border-gray-800" : "bg-white/80 border-slate-200"
-          } border-b backdrop-blur-sm shadow-sm`}
+          className={`fixed top-0 left-0 right-0 z-40 ${
+            isDarkMode ? "bg-gray-900 border-gray-800" : "bg-white border-slate-200"
+          } border-b shadow-sm lg:pl-64`}
         >
           <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
             <div className="flex items-center">
@@ -835,7 +823,7 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
         </header>
 
         {/* Main Content Area */}
-        <main className="py-8 px-4 sm:px-6 lg:px-8">
+        <main className="pt-24 pb-8 px-4 sm:px-6 lg:px-8">
           {/* Header Section */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
