@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { useSession, signOut } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import {
   Cell,
   LineChart,
@@ -82,113 +84,6 @@ const generateWeeklyData = (): WeeklySummary[] => {
   }))
 }
 
-const generateHabits = (): Habit[] => {
-  return [
-    {
-      id: "1",
-      name: "Sleep",
-      icon: "😴",
-      target: 8,
-      unit: "hours",
-      frequency: "daily",
-      progress: 7,
-      streak: 5,
-      history: Array(30)
-        .fill(0)
-        .map((_, i) => ({
-          date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-          value: 5 + Math.random() * 4,
-        })),
-      color: "#6366F1",
-    },
-    {
-      id: "2",
-      name: "Water",
-      icon: "💧",
-      target: 8,
-      unit: "glasses",
-      frequency: "daily",
-      progress: 6,
-      streak: 12,
-      history: Array(30)
-        .fill(0)
-        .map((_, i) => ({
-          date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-          value: 4 + Math.random() * 5,
-        })),
-      color: "#38BDF8",
-    },
-    {
-      id: "3",
-      name: "Exercise",
-      icon: "🏃",
-      target: 30,
-      unit: "minutes",
-      frequency: "daily",
-      progress: 15,
-      streak: 3,
-      history: Array(30)
-        .fill(0)
-        .map((_, i) => ({
-          date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-          value: Math.random() * 60,
-        })),
-      color: "#FB923C",
-    },
-    {
-      id: "4",
-      name: "Meditation",
-      icon: "🧘",
-      target: 20,
-      unit: "minutes",
-      frequency: "daily",
-      progress: 20,
-      streak: 8,
-      history: Array(30)
-        .fill(0)
-        .map((_, i) => ({
-          date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-          value: 5 + Math.random() * 25,
-        })),
-      color: "#A855F7",
-    },
-    {
-      id: "5",
-      name: "Reading",
-      icon: "📚",
-      target: 30,
-      unit: "minutes",
-      frequency: "daily",
-      progress: 25,
-      streak: 4,
-      history: Array(30)
-        .fill(0)
-        .map((_, i) => ({
-          date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-          value: Math.random() * 60,
-        })),
-      color: "#14B8A6",
-    },
-    {
-      id: "6",
-      name: "Screen Time",
-      icon: "📱",
-      target: 120,
-      unit: "minutes",
-      frequency: "daily",
-      progress: 180,
-      streak: 0,
-      history: Array(30)
-        .fill(0)
-        .map((_, i) => ({
-          date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-          value: 60 + Math.random() * 240,
-        })),
-      color: "#F43F5E",
-    },
-  ]
-}
-
 // Helper function to get week number
 Date.prototype.getWeek = function () {
   const date = new Date(this.getTime())
@@ -199,6 +94,26 @@ Date.prototype.getWeek = function () {
 }
 
 const App = () => {
+
+  const { data: session, status } = useSession()
+  const router = useRouter()
+  
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login")
+    }
+  }, [status, router])
+
+  const [user, setUser] = useState<User>({
+    name: session?.user?.name || "User",
+    avatar: session?.user?.avatar || "https://randomuser.me/api/portraits/men/44.jpg",
+    joinedDate: new Date().toISOString(),
+    currentStreak: 0,
+    longestStreak: 0,
+  })
+
+
   // Function to dismiss a reminder
   const dismissReminder = (reminderId: string) => {
     setReminders((prevReminders) =>
@@ -206,14 +121,6 @@ const App = () => {
     )
     showToast("Reminder dismissed")
   }
-  // State
-  const [user, setUser] = useState<User>({
-    name: "Swagat Kumar Dash",
-    avatar: "https://randomuser.me/api/portraits/men/44.jpg",
-    joinedDate: "2023-11-15",
-    currentStreak: 5,
-    longestStreak: 21,
-  })
 
   // Add this new state right after other useState declarations
 const [newHabitForm, setNewHabitForm] = useState({
@@ -225,7 +132,7 @@ const [newHabitForm, setNewHabitForm] = useState({
   color: "#6366F1"
 });
 
-  const [habits, setHabits] = useState<Habit[]>(generateHabits())
+  const [habits, setHabits] = useState<Habit[]>([])
   const [weeklyData] = useState<WeeklySummary[]>(generateWeeklyData())
   const [selectedPeriod, setSelectedPeriod] = useState<string>("week")
   const [selectedHabit, setSelectedHabit] = useState<string>("all")
@@ -242,9 +149,28 @@ const [newHabitForm, setNewHabitForm] = useState({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false)
   const sidebarRef = useRef < HTMLDivElement > (null)
   const buttonRef = useRef<HTMLButtonElement>(null)
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState<boolean>(false)
 
   // Effect to show today's date
   const [currentDate, setCurrentDate] = useState<string>("")
+
+  useEffect(() => {
+  const fetchHabits = async () => {
+    try {
+      const response = await fetch('/api/habits');
+      if (response.ok) {
+        const { habits } = await response.json();
+        setHabits(habits);
+      }
+    } catch (error) {
+      console.error("Error fetching habits:", error);
+    }
+  };
+  
+  if (session) {
+    fetchHabits();
+  }
+}, [session]);
 
   useEffect(() => {
     updateRemindersBasedOnHabits(habits);
@@ -277,6 +203,36 @@ const [newHabitForm, setNewHabitForm] = useState({
     }
   }, [isMobileMenuOpen])
 
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const userResponse = await fetch('/api/user');
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          setUser({
+            name: userData.name,
+            avatar: userData.avatar,
+            joinedDate: userData.joinedDate,
+            currentStreak: userData.currentStreak,
+            longestStreak: userData.longestStreak,
+          });
+        }
+        
+        const habitsResponse = await fetch('/api/habits');
+        if (habitsResponse.ok) {
+          const { habits } = await habitsResponse.json();
+          setHabits(habits);
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+    
+    if (session) {
+      fetchUserData();
+    }
+  }, [session]);
+
   // Add this new useEffect to ensure sidebar styling is consistent with theme:
   useEffect(() => {
     // This ensures the sidebar styling is consistent with the current theme
@@ -291,6 +247,11 @@ const [newHabitForm, setNewHabitForm] = useState({
     }
   }, [isDarkMode, isMobileMenuOpen]);
 
+  const handleLogout = () => {
+  setIsLogoutModalOpen(false);
+  signOut({ callbackUrl: '/login' });
+};
+
   // Helper function to display toast
   const showToast = (message: string) => {
     setToastMessage(message)
@@ -299,48 +260,38 @@ const [newHabitForm, setNewHabitForm] = useState({
   }
 
   // Function to update habit progress
-  const updateHabitProgress = (habitId: string, newProgress: number) => {
-    const today = new Date().toISOString().split("T")[0]
-  
-    setHabits((prevHabits) => {
-      const updatedHabits = prevHabits.map((habit) => {
-        if (habit.id === habitId) {
-          // Existing code for habit update calculation
-          const wasCompleted = habit.progress >= habit.target
-          const isNowCompleted = newProgress >= habit.target
-          let newStreak = habit.streak
-  
-          if (isNowCompleted && (!wasCompleted || habit.lastUpdated !== today)) {
-            newStreak = habit.streak + 1
-          }
-          else if (newProgress === 0) {
-            newStreak = 0
-          }
-  
-          return {
-            ...habit,
-            progress: newProgress,
-            streak: newStreak,
-            lastUpdated: today,
-            history: [
-              ...habit.history.slice(0, -1),
-              { ...habit.history[habit.history.length - 1], value: newProgress },
-            ],
-          }
-        }
-        return habit
+  const updateHabitProgress = async (habitId: string, newProgress: number) => {
+    try {
+      const response = await fetch(`/api/habits/${habitId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ progress: newProgress }),
       });
       
-      // Process reminders immediately after updating habits, but before the state update completes
-      setTimeout(() => {
-        updateRemindersBasedOnHabits(updatedHabits);
-      }, 0);
-      
-      return updatedHabits;
-    });
-  
-    const habitName = habits.find((h) => h.id === habitId)?.name
-    showToast(`Updated ${habitName} progress!`)
+      if (response.ok) {
+        const { habit } = await response.json();
+        
+        // Update local state with server response
+        setHabits((prevHabits) => {
+          return prevHabits.map((h) => 
+            h.id === habitId ? { ...h, ...habit } : h
+          );
+        });
+        
+        // Also refresh user data for updated streaks
+        const userResponse = await fetch('/api/user');
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          setUser(prev => ({
+            ...prev,
+            currentStreak: userData.currentStreak,
+            longestStreak: userData.longestStreak,
+          }));
+        }
+      }
+    } catch (error) {
+      console.error("Error updating habit:", error);
+    }
   }
 
   // Function to update reminders after habit progress change
@@ -567,7 +518,7 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
                 H
               </motion.div>
               <span className="text-xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-violet-500 to-fuchsia-600">
-                HabitHub
+                Habit-Tracker
               </span>
             </div>
             <button
@@ -704,6 +655,16 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
               >
                 <Settings className="h-5 w-5 text-gray-500" />
               </button>
+      <button
+        onClick={() => setIsLogoutModalOpen(true)}
+        className={`p-1.5 rounded-lg ${isDarkMode ? "hover:bg-gray-800 text-red-400" : "hover:bg-gray-100 text-red-500"}`}
+        title="Sign out"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V8.5a1 1 0 10-2 0V15H4V5h9.5a1 1 0 100-2H3z" clipRule="evenodd" />
+          <path d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H7a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" />
+        </svg>
+      </button>
             </div>
           </div>
         </div>
@@ -1503,7 +1464,7 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
                   H
                 </div>
                 <span className="ml-2 text-xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-violet-500 to-fuchsia-600">
-                  HabitHub
+                  Habit-Tracker
                 </span>
               </div>
               <div className="flex space-x-6">
@@ -1540,7 +1501,7 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
               </div>
               <div className="mt-4 md:mt-0">
                 <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                  © 2025 HabitHub. All rights reserved.
+                  © 2025 Habit-Tracker. All rights reserved.
                 </span>
               </div>
             </div>
@@ -1758,6 +1719,18 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
                   >
                     Cancel
                   </motion.button>
+                  <motion.button
+  whileHover={{ scale: 1.05 }}
+  whileTap={{ scale: 0.95 }}
+  type="button"
+  className="mt-3 w-full inline-flex justify-center rounded-xl border border-red-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-800 dark:border-red-800 dark:text-red-400 dark:hover:bg-gray-700"
+  onClick={() => {
+    setIsSettingsOpen(false);
+    setIsLogoutModalOpen(true);
+  }}
+>
+  Sign out
+</motion.button>
                 </div>
               </motion.div>
             </div>
@@ -2262,6 +2235,80 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
           </motion.div>
         )}
       </AnimatePresence>
+<AnimatePresence>
+  {isLogoutModalOpen && (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed z-50 inset-0 overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          setIsLogoutModalOpen(false);
+        }
+      }}
+    >
+      <div className="flex items-center justify-center min-h-screen p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm" aria-hidden="true"></div>
+
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.9, opacity: 0 }}
+          className={`relative rounded-2xl p-6 w-full max-w-sm mx-auto shadow-xl border ${
+            isDarkMode ? "bg-gray-900 text-white border-gray-800" : "bg-white text-gray-900 border-slate-200"
+          }`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="text-center">
+            <svg 
+              className="mx-auto h-12 w-12 text-red-500" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor" 
+              aria-hidden="true"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" 
+              />
+            </svg>
+            <h3 className="mt-4 text-lg font-medium">Sign out from HabitHub?</h3>
+            <p className={`mt-2 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+              Your progress is saved. You can sign back in anytime.
+            </p>
+          </div>
+          <div className="mt-6 sm:flex sm:flex-row-reverse">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              type="button"
+              className="w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
+              onClick={handleLogout}
+            >
+              Sign out
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              type="button"
+              className={`mt-3 w-full inline-flex justify-center rounded-xl border shadow-sm px-4 py-2 text-base font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500 sm:mt-0 sm:w-auto sm:text-sm ${
+                isDarkMode
+                  ? "border-gray-700 bg-gray-800 text-white hover:bg-gray-700"
+                  : "border-slate-200 bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+              onClick={() => setIsLogoutModalOpen(false)}
+            >
+              Cancel
+            </motion.button>
+          </div>
+        </motion.div>
+      </div>
+    </motion.div>
+  )}
+</AnimatePresence>
     </div>
   )
 }

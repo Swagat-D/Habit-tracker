@@ -1,5 +1,7 @@
+// src/app/layout.tsx (updated)
 import './globals.css';
 import type { Metadata } from 'next';
+import { AuthProvider } from '@/providers/AuthProvider';
 
 export const metadata: Metadata = {
   title: 'Personal Analytics & Habit Tracker',
@@ -13,7 +15,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-gray-50 font-sans">{children}</body>
+      <AuthProvider>
+        <body className="min-h-screen bg-gray-50 font-sans">{children}</body>
+      </AuthProvider>
     </html>
   );
 }
