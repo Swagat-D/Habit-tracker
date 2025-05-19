@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client"
 
 import { useState, useEffect, useRef } from "react"
@@ -23,7 +24,7 @@ import { Activity, BarChart3, Bell, BookOpen, Calendar, Download, Droplets, Edit
 
 // Type definitions
 type Habit = {
-  id: string
+  id: string | { toString(): string }
   name: string
   icon: string
   target: number
@@ -84,17 +85,7 @@ const generateWeeklyData = (): WeeklySummary[] => {
   }))
 }
 
-// Helper function to get week number
-Date.prototype.getWeek = function () {
-  const date = new Date(this.getTime())
-  date.setHours(0, 0, 0, 0)
-  date.setDate(date.getDate() + 3 - ((date.getDay() + 6) % 7))
-  const week1 = new Date(date.getFullYear(), 0, 4)
-  return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7)
-}
-
 const App = () => {
-
   const { data: session, status } = useSession()
   const router = useRouter()
   
@@ -113,26 +104,18 @@ const App = () => {
     longestStreak: 0,
   })
 
-
-  // Function to dismiss a reminder
-  const dismissReminder = (reminderId: string) => {
-    setReminders((prevReminders) =>
-      prevReminders.map((reminder) => (reminder.id === reminderId ? { ...reminder, dismissed: true } : reminder))
-    )
-    showToast("Reminder dismissed")
-  }
-
-  // Add this new state right after other useState declarations
-const [newHabitForm, setNewHabitForm] = useState({
-  name: "",
-  icon: "🏃",
-  target: 1,
-  unit: "times",
-  frequency: "daily",
-  color: "#6366F1"
-});
+  const [newHabitForm, setNewHabitForm] = useState({
+    name: "",
+    icon: "🏃",
+    target: 1,
+    unit: "times",
+    frequency: "daily",
+    color: "#6366F1"
+  })
 
   const [habits, setHabits] = useState<Habit[]>([])
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [isLoading, setIsLoading] = useState(true)
   const [weeklyData] = useState<WeeklySummary[]>(generateWeeklyData())
   const [selectedPeriod, setSelectedPeriod] = useState<string>("week")
   const [selectedHabit, setSelectedHabit] = useState<string>("all")
@@ -147,44 +130,43 @@ const [newHabitForm, setNewHabitForm] = useState({
   const [activeTab, setActiveTab] = useState<string>("dashboard")
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false)
-  const sidebarRef = useRef < HTMLDivElement > (null)
+  const sidebarRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState<boolean>(false)
-
-  // Effect to show today's date
   const [currentDate, setCurrentDate] = useState<string>("")
 
   useEffect(() => {
-  const fetchHabits = async () => {
-    try {
-      const response = await fetch('/api/habits');
-      if (response.ok) {
-        const { habits } = await response.json();
-        setHabits(habits);
+    const fetchHabits = async () => {
+      try {
+        setIsLoading(true)
+        const response = await fetch('/api/habits')
+        if (!response.ok) {
+          throw new Error('Failed to fetch habits')
+        }
+        const data = await response.json()
+        setHabits(data.habits || [])
+      } catch (error) {
+        console.error("Error fetching habits:", error)
+        showToast("Failed to load habits")
+      } finally {
+        setIsLoading(false)
       }
-    } catch (error) {
-      console.error("Error fetching habits:", error);
     }
-  };
-  
-  if (session) {
-    fetchHabits();
-  }
-}, [session]);
+
+    fetchHabits()
+  }, [])
 
   useEffect(() => {
-    updateRemindersBasedOnHabits(habits);
+    updateRemindersBasedOnHabits(habits)
   }, [habits])
 
   useEffect(() => {
     const now = new Date()
     setCurrentDate(now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" }))
 
-    // Check user's preferred color scheme
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
     setIsDarkMode(prefersDark)
 
-    // Add event listener to close mobile menu when clicking outside
     function handleClickOutside(event: MouseEvent) {
       if (
         sidebarRef.current &&
@@ -206,199 +188,248 @@ const [newHabitForm, setNewHabitForm] = useState({
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const userResponse = await fetch('/api/user');
+        const userResponse = await fetch('/api/user')
         if (userResponse.ok) {
-          const userData = await userResponse.json();
+          const userData = await userResponse.json()
           setUser({
             name: userData.name,
             avatar: userData.avatar,
             joinedDate: userData.joinedDate,
             currentStreak: userData.currentStreak,
             longestStreak: userData.longestStreak,
-          });
+          })
         }
         
-        const habitsResponse = await fetch('/api/habits');
+        const habitsResponse = await fetch('/api/habits')
         if (habitsResponse.ok) {
-          const { habits } = await habitsResponse.json();
-          setHabits(habits);
+          const { habits } = await habitsResponse.json()
+          setHabits(habits)
         }
       } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Error fetching data:", error)
       }
-    };
+    }
     
     if (session) {
-      fetchUserData();
+      fetchUserData()
     }
-  }, [session]);
+  }, [session])
 
-  // Add this new useEffect to ensure sidebar styling is consistent with theme:
   useEffect(() => {
-    // This ensures the sidebar styling is consistent with the current theme
     if (sidebarRef.current) {
       if (isDarkMode) {
-        sidebarRef.current.classList.add("bg-gray-900", "text-white", "border-gray-800");
-        sidebarRef.current.classList.remove("bg-white", "text-gray-900", "border-slate-200");
+        sidebarRef.current.classList.add("bg-gray-900", "text-white", "border-gray-800")
+        sidebarRef.current.classList.remove("bg-white", "text-gray-900", "border-slate-200")
       } else {
-        sidebarRef.current.classList.add("bg-white", "text-gray-900", "border-slate-200");
-        sidebarRef.current.classList.remove("bg-gray-900", "text-white", "border-gray-800");
+        sidebarRef.current.classList.add("bg-white", "text-gray-900", "border-slate-200")
+        sidebarRef.current.classList.remove("bg-gray-900", "text-white", "border-gray-800")
       }
     }
-  }, [isDarkMode, isMobileMenuOpen]);
+  }, [isDarkMode, isMobileMenuOpen])
 
   const handleLogout = () => {
-  setIsLogoutModalOpen(false);
-  signOut({ callbackUrl: '/login' });
-};
+    setIsLogoutModalOpen(false)
+    signOut({ callbackUrl: '/login' })
+  }
 
-  // Helper function to display toast
   const showToast = (message: string) => {
     setToastMessage(message)
     setShowSuccessToast(true)
     setTimeout(() => setShowSuccessToast(false), 3000)
   }
 
-  // Function to update habit progress
   const updateHabitProgress = async (habitId: string, newProgress: number) => {
     try {
+      if (!habitId) {
+        console.error("Error: habitId is undefined")
+        showToast("Error: Cannot update habit with undefined ID")
+        return
+      }
+      
+      console.log("Updating habit progress:", habitId, newProgress)
+      
       const response = await fetch(`/api/habits/${habitId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json' 
+        },
         body: JSON.stringify({ progress: newProgress }),
-      });
+      })
       
-      if (response.ok) {
-        const { habit } = await response.json();
-        
-        // Update local state with server response
-        setHabits((prevHabits) => {
-          return prevHabits.map((h) => 
-            h.id === habitId ? { ...h, ...habit } : h
-          );
-        });
-        
-        // Also refresh user data for updated streaks
-        const userResponse = await fetch('/api/user');
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.error("Error updating habit progress:", errorData)
+        showToast(errorData.error || "Failed to update habit progress")
+        return
+      }
+      
+      const data = await response.json()
+      console.log("Habit update response:", data)
+      
+      // Update local state with the returned habit data
+      setHabits((prevHabits) =>
+        prevHabits.map((h) => {
+          const hId = typeof h.id === 'string' ? h.id : h.id.toString()
+          if (hId === habitId) {
+            console.log("Updating habit in state:", hId)
+            return { ...h, ...data.habit }
+          }
+          return h
+        })
+      )
+      
+      showToast("Habit progress updated successfully!")
+      
+      // Refresh user data for updated streaks
+      try {
+        const userResponse = await fetch('/api/user')
         if (userResponse.ok) {
-          const userData = await userResponse.json();
+          const userData = await userResponse.json()
           setUser(prev => ({
             ...prev,
             currentStreak: userData.currentStreak,
             longestStreak: userData.longestStreak,
-          }));
+          }))
+        } else {
+          console.error("Failed to fetch updated user data")
         }
+      } catch (error) {
+        console.error("Error fetching user data:", error)
       }
     } catch (error) {
-      console.error("Error updating habit:", error);
+      console.error("Error updating habit:", error)
+      showToast("Something went wrong. Please try again.")
     }
   }
 
-  // Function to update reminders after habit progress change
-  // Add this new function to replace both existing reminder functions
-const updateRemindersBasedOnHabits = (currentHabits: Habit[]) => {
-  // Start with a fresh array for new reminders
-  const newReminders: Reminder[] = [];
-  
-  // Process each habit and generate appropriate reminders
-  currentHabits.forEach((habit) => {
-    // Screen time reminders - only if over target
-    if (habit.name === "Screen Time" && habit.progress > habit.target) {
-      newReminders.push({
-        id: `over-${habit.id}`,
-        habitId: habit.id,
-        icon: habit.icon,
-        title: `${habit.name} goal exceeded`,
-        message: `You're ${habit.progress - habit.target} ${habit.unit} over your goal`,
-        type: "warning",
-        dismissed: false,
-      });
-    }
+  const updateRemindersBasedOnHabits = (currentHabits: Habit[]) => {
+    const newReminders: Reminder[] = []
     
-    // Water reminders - only if under target
-if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(habit.target.toString())) {
-  const remaining = habit.target - habit.progress;
-  const glassText = remaining === 1 ? "glass" : "glasses";
-  newReminders.push({
-    id: `under-${habit.id}`,
-    habitId: habit.id,
-    icon: habit.icon,
-    title: `Drink more water`,
-    message: `${remaining} more ${glassText} needed today`,
-    type: "info",
-    dismissed: false,
-  });
-}
+    currentHabits.forEach((habit) => {
+      const habitId = habit.id !== undefined && habit.id !== null
+        ? (typeof habit.id === 'string' ? habit.id : habit.id.toString())
+        : ""
+      
+      if (habit.name === "Screen Time" && habit.progress > habit.target) {
+        newReminders.push({
+          id: `over-${habitId}`,
+          habitId: habitId,
+          icon: habit.icon,
+          title: `${habit.name} goal exceeded`,
+          message: `You're ${habit.progress - habit.target} ${habit.unit} over your goal`,
+          type: "warning",
+          dismissed: false,
+        })
+      }
+      
+      if (habit.name === "Water" && habit.progress < habit.target) {
+        const remaining = habit.target - habit.progress
+        const glassText = remaining === 1 ? "glass" : "glasses"
+        newReminders.push({
+          id: `under-${habitId}`,
+          habitId: habitId,
+          icon: habit.icon,
+          title: `Drink more water`,
+          message: `${remaining} more ${glassText} needed today`,
+          type: "info",
+          dismissed: false,
+        })
+      }
+      
+      if (habit.name === "Exercise" && habit.streak === 0) {
+        newReminders.push({
+          id: `streak-${habitId}`,
+          habitId: habitId,
+          icon: habit.icon,
+          title: `Exercise reminder`,
+          message: `You haven't exercised in 2 days`,
+          type: "success",
+          dismissed: false,
+        })
+      }
+    })
     
-    // Exercise streak reminders - only if streak is 0
-    if (habit.name === "Exercise" && habit.streak === 0) {
-      newReminders.push({
-        id: `streak-${habit.id}`,
-        habitId: habit.id,
-        icon: habit.icon,
-        title: `Exercise reminder`,
-        message: `You haven't exercised in 2 days`,
-        type: "success",
-        dismissed: false,
-      });
-    }
-  });
-  
-  // Replace all reminders with the new set
-  setReminders(newReminders);
-}
-
-  // Function to add a new habit
-  const addNewHabit = (newHabit: Omit<Habit, "id" | "history" | "streak" | "progress" | "lastUpdated">) => {
-    const id = (habits.length + 1).toString()
-    const newHabitComplete: Habit = {
-      ...newHabit,
-      id,
-      progress: 0,
-      streak: 0,
-      lastUpdated: null,
-      history: Array(30)
-        .fill(0)
-        .map((_, i) => ({
-          date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-          value: Math.random() * newHabit.target,
-        })),
-    }
-  
-    setHabits((prev) => {
-      const updatedHabits = [...prev, newHabitComplete];
-      // Update reminders based on new habit collection
-      setTimeout(() => updateRemindersBasedOnHabits(updatedHabits), 0);
-      return updatedHabits;
-    });
-    
-    setIsNewHabitModalOpen(false)
-    showToast(`Added new habit: ${newHabit.name}`)
+    setReminders(newReminders)
   }
 
-  // Function to delete a habit
-  const deleteHabit = (habitId: string) => {
-    const habitName = habits.find((h) => h.id === habitId)?.name
-    
-    setHabits((prevHabits) => {
-      const updatedHabits = prevHabits.filter((habit) => habit.id !== habitId);
-      // Clean up reminders related to this habit
-      setReminders((prevReminders) => 
-        prevReminders.filter((reminder) => reminder.habitId !== habitId)
-      );
-      // Update reminders
-      setTimeout(() => updateRemindersBasedOnHabits(updatedHabits), 0);
-      return updatedHabits;
-    });
-    
-    setIsHabitDetailOpen(false)
-    showToast(`Deleted habit: ${habitName}`)
+  const addNewHabit = async (habit: Habit) => {
+    try {
+      const response = await fetch('/api/habits', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(habit),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.error("Error adding habit:", errorData)
+        showToast(errorData.error || "Failed to add habit")
+        return
+      }
+
+      const data = await response.json()
+      setHabits(prevHabits => [...prevHabits, data.habit])
+      setIsNewHabitModalOpen(false)
+      showToast("Habit created successfully!")
+    } catch (error) {
+      console.error("Error adding habit:", error)
+      showToast("Something went wrong. Please try again.")
+    }
   }
 
-  // Filtered habits based on search
+  const deleteHabit = async (habitId: string) => {
+    try {
+      if (!habitId) {
+        console.error("Error: habitId is undefined")
+        showToast("Error: Cannot delete habit with undefined ID")
+        return
+      }
+      
+      console.log("Deleting habit:", habitId)
+      
+      if (window.confirm("Are you sure you want to delete this habit?")) {
+        const response = await fetch(`/api/habits/${habitId}`, {
+          method: 'DELETE',
+          headers: { 
+            'Content-Type': 'application/json' 
+          }
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          console.error("Error deleting habit:", errorData)
+          showToast(errorData.error || "Failed to delete habit")
+          return
+        }
+
+        // Remove the deleted habit from state
+        setHabits((prevHabits) =>
+          prevHabits.filter((habit) => {
+            const hId = typeof habit.id === 'string' ? habit.id : habit.id.toString()
+            return hId !== habitId
+          })
+        )
+        
+        setIsHabitDetailOpen(false) // Close the habit detail modal
+        showToast("Habit deleted successfully!")
+      }
+    } catch (error) {
+      console.error("Error deleting habit:", error)
+      showToast("Something went wrong. Please try again.")
+    }
+  }
+
+  const dismissReminder = (reminderId: string) => {
+    setReminders((prevReminders) =>
+      prevReminders.map((reminder) => (reminder.id === reminderId ? { ...reminder, dismissed: true } : reminder))
+    )
+    showToast("Reminder dismissed")
+  }
+
   const filteredHabits = habits.filter((habit) => habit.name.toLowerCase().includes(searchQuery.toLowerCase()))
 
-  // Calculate daily progress
   const dailyProgress: DailyProgress[] = habits.map((habit) => ({
     habit: habit.name,
     progress: habit.progress,
@@ -407,19 +438,16 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
     color: habit.color,
   }))
 
-  // Calculate completion percentages for pie chart
   const completionData = [
     { name: "Completed", value: habits.filter((h) => h.progress >= h.target).length, color: "#10B981" },
     { name: "Remaining", value: habits.filter((h) => h.progress < h.target).length, color: "#E4E4E7" },
   ]
 
-  // Function to open habit details
   const openHabitDetail = (habit: Habit) => {
     setCurrentDetailHabit(habit)
     setIsHabitDetailOpen(true)
   }
 
-  // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -440,7 +468,6 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
     },
   }
 
-  // Get habit icon component based on name
   const getHabitIcon = (habitName: string, className = "h-5 w-5") => {
     switch (habitName) {
       case "Sleep":
@@ -460,7 +487,6 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
     }
   }
 
-  // Get reminder icon based on type
   const getReminderIcon = (type: "warning" | "info" | "success") => {
     switch (type) {
       case "warning":
@@ -474,11 +500,10 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
     }
   }
 
-  // Custom tooltip for BarChart to match theme
   interface CustomBarTooltipProps {
-    active?: boolean;
-    payload?: { value: number }[];
-    label?: string;
+    active?: boolean
+    payload?: { value: number }[]
+    label?: string
   }
 
   const CustomBarTooltip = ({ active, payload, label }: CustomBarTooltipProps) => {
@@ -503,7 +528,7 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
         className={`fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         } ${
-          isDarkMode ? "bg-gray-900 border-gray-800 text-white" : "bg-white border-slate-200 text-gray-900"
+          isDarkMode ? "bg-gray-900 border-gray-800 text-white " : "bg-white border-slate-200 text-gray-900"
         } border-r shadow-lg lg:shadow-none`}
       >
         <div className="flex h-full flex-col">
@@ -583,10 +608,10 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
               <div className="mt-3 space-y-1">
                 {habits.map((habit) => (
                   <button
-                    key={habit.id}
+                    key={habit.id ? (typeof habit.id === 'string' ? habit.id : habit.id.toString()) : `habit-${habit.name}`}
                     onClick={() => openHabitDetail(habit)}
                     className={`flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 border ${
-                      selectedHabit === habit.id
+                      selectedHabit === (habit.id ? (typeof habit.id === 'string' ? habit.id : habit.id.toString()) : `habit-${habit.name}`)
                         ? `${
                             isDarkMode
                               ? "bg-gray-800 text-white border-gray-700"
@@ -655,16 +680,16 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
               >
                 <Settings className="h-5 w-5 text-gray-500" />
               </button>
-      <button
-        onClick={() => setIsLogoutModalOpen(true)}
-        className={`p-1.5 rounded-lg ${isDarkMode ? "hover:bg-gray-800 text-red-400" : "hover:bg-gray-100 text-red-500"}`}
-        title="Sign out"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V8.5a1 1 0 10-2 0V15H4V5h9.5a1 1 0 100-2H3z" clipRule="evenodd" />
-          <path d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H7a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" />
-        </svg>
-      </button>
+              <button
+                onClick={() => setIsLogoutModalOpen(true)}
+                className={`p-1.5 rounded-lg ${isDarkMode ? "hover:bg-gray-800 text-red-400" : "hover:bg-gray-100 text-red-500"}`}
+                title="Sign out"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V8.5a1 1 0 10-2 0V15H4V5h9.5a1 1 0 100-2H3z" clipRule="evenodd" />
+                  <path d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H7a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
@@ -740,7 +765,10 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
                 >
                   <option value="all">All Habits Graph</option>
                   {habits.map((habit) => (
-                    <option key={habit.id} value={habit.id}>
+                    <option
+                      key={habit.id ? (typeof habit.id === 'string' ? habit.id : habit.id.toString()) : `habit-${habit.name}`}
+                      value={habit.id ? (typeof habit.id === 'string' ? habit.id : habit.id.toString()) : `habit-${habit.name}`}
+                    >
                       {habit.name}
                     </option>
                   ))}
@@ -1006,7 +1034,7 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
                   ) : (
                     filteredHabits.map((habit) => (
                       <motion.div
-                        key={habit.id}
+                        key={habit.id ? (typeof habit.id === 'string' ? habit.id : habit.id.toString()) : `habit-${habit.name}`}
                         className={`relative p-5 rounded-xl border ${
                           isDarkMode ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-slate-200"
                         }`}
@@ -1074,7 +1102,15 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
                               whileHover={{ scale: 1.1 }}
                               whileTap={{ scale: 0.9 }}
                               className="inline-flex items-center p-1.5 border border-transparent rounded-full shadow-sm text-white bg-violet-600 hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500"
-                              onClick={() => updateHabitProgress(habit.id, Math.max(0, habit.progress - 1))}
+                              onClick={() => {
+    if (!currentDetailHabit || !currentDetailHabit.id) return; // Prevent error if currentDetailHabit or id is undefined
+    updateHabitProgress(
+      typeof currentDetailHabit.id === 'string'
+        ? currentDetailHabit.id
+        : currentDetailHabit.id.toString(),
+      Math.max(0, currentDetailHabit.progress - 1)
+    );
+  }}
                             >
                               <svg
                                 className="h-3.5 w-3.5"
@@ -1093,7 +1129,7 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
                               whileHover={{ scale: 1.1 }}
                               whileTap={{ scale: 0.9 }}
                               className="inline-flex items-center p-1.5 border border-transparent rounded-full shadow-sm text-white bg-violet-600 hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500"
-                              onClick={() => updateHabitProgress(habit.id, habit.progress + 1)}
+                              onClick={() => updateHabitProgress(typeof habit.id === 'string' ? habit.id : habit.id.toString(), habit.progress + 1)}
                             >
                               <svg
                                 className="h-3.5 w-3.5"
@@ -1118,9 +1154,8 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
                               } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500`}
                               onClick={() => {
                                 const today = new Date().toISOString().split("T")[0]
-                                // Only mark complete if not already completed today
                                 if (!(habit.progress >= habit.target && habit.lastUpdated === today)) {
-                                  updateHabitProgress(habit.id, habit.target)
+                                  updateHabitProgress(typeof habit.id === 'string' ? habit.id : habit.id.toString(), habit.target)
                                 }
                               }}
                             >
@@ -1585,6 +1620,8 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
                         </div>
                       </div>
 
+
+
                       <div className="mb-6">
                         <label
                           className={`block text-sm font-medium mb-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
@@ -1931,7 +1968,13 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
       showToast("Please enter a habit name");
       return;
     }
-    addNewHabit(newHabitForm);
+    addNewHabit({
+      ...newHabitForm,
+      id: crypto.randomUUID(),
+      progress: 0,
+      streak: 0,
+      history: [],
+    });
     // Reset form after creating habit
     setNewHabitForm({
       name: "",
@@ -2137,7 +2180,7 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
                         whileTap={{ scale: 0.9 }}
                         className="inline-flex items-center p-2 border border-transparent rounded-full shadow-sm text-white bg-violet-600 hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500"
                         onClick={() =>
-                          updateHabitProgress(currentDetailHabit.id, Math.max(0, currentDetailHabit.progress - 1))
+                          updateHabitProgress(currentDetailHabit.id.toString(), Math.max(0, currentDetailHabit.progress - 1))
                         }
                       >
                         <svg
@@ -2161,16 +2204,30 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
                             : "bg-white border-gray-300 text-gray-900"
                         }`}
                         value={currentDetailHabit.progress}
-                        onChange={(e) =>
-                          updateHabitProgress(currentDetailHabit.id, Math.max(0, Number.parseInt(e.target.value) || 0))
-                        }
+                        onChange={(e) => {
+    if (!currentDetailHabit.id) return;
+    updateHabitProgress(
+      typeof currentDetailHabit.id === 'string'
+        ? currentDetailHabit.id
+        : currentDetailHabit.id.toString(),
+      Math.max(0, Number.parseInt(e.target.value) || 0)
+    );
+  }}
                       />
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         className="inline-flex items-center p-2 border border-transparent rounded-full shadow-sm text-white bg-violet-600 hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500"
-                        onClick={() => updateHabitProgress(currentDetailHabit.id, currentDetailHabit.progress + 1)}
-                      >
+                          onClick={() => {
+    if (!currentDetailHabit.id) return;
+    updateHabitProgress(
+      typeof currentDetailHabit.id === 'string'
+        ? currentDetailHabit.id
+        : currentDetailHabit.id.toString(),
+      currentDetailHabit.progress + 1
+    );
+  }}
+                          >
                         <svg
                           className="h-5 w-5"
                           xmlns="http://www.w3.org/2000/svg"
@@ -2202,7 +2259,14 @@ if (habit.name === "Water" && parseInt(habit.progress.toString()) < parseInt(hab
                     whileTap={{ scale: 0.95 }}
                     type="button"
                     className="mt-3 w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-2 bg-rose-600 hover:bg-rose-700 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500 sm:mt-0 sm:w-auto sm:text-sm"
-                    onClick={() => deleteHabit(currentDetailHabit.id)}
+                    onClick={() => {
+    if (!currentDetailHabit.id) return;
+    deleteHabit(
+      typeof currentDetailHabit.id === 'string'
+        ? currentDetailHabit.id
+        : currentDetailHabit.id.toString()
+    );
+  }}
                   >
                     Delete Habit
                   </motion.button>

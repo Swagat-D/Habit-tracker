@@ -1,12 +1,17 @@
 // src/app/api/habits/[id]/route.ts
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { getServerSession } from "next-auth/next";
 import dbConnect from "@/utils/dbConnect";
 import Habit from "@/models/Habit";
 import User from "@/models/User";
-import { authOptions } from "../../auth/[...nextauth]/route";
+import { authOptions } from "@/lib/authOptions";
 
-export async function PUT(req, { params }) {
+export async function PUT(
+  req: NextRequest,
+  context: { params: { id: string } }
+) {
+  const {id} = context.params;
   try {
     const session = await getServerSession(authOptions);
     
@@ -17,7 +22,7 @@ export async function PUT(req, { params }) {
     await dbConnect();
     
     const { progress } = await req.json();
-    const habitId = params.id;
+    const habitId = id;
     
     // Find the habit and verify ownership
     const habit = await Habit.findOne({ _id: habitId, userId: session.user.id });
@@ -46,7 +51,7 @@ export async function PUT(req, { params }) {
     
     // Update history for today
     const historyIndex = habit.history.findIndex(
-      (entry) => new Date(entry.date).toDateString() === today.toDateString()
+      (entry: { date: Date }) => new Date(entry.date).toDateString() === today.toDateString()
     );
     
     if (historyIndex >= 0) {
@@ -93,11 +98,15 @@ export async function PUT(req, { params }) {
     
     return NextResponse.json({ habit }, { status: 200 });
   } catch (error) {
+    console.error(error);
     return NextResponse.json({ error: "Failed to update habit" }, { status: 500 });
   }
 }
 
-export async function DELETE(req, { params }) {
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
     const session = await getServerSession(authOptions);
     

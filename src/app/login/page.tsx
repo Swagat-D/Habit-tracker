@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { signIn } from 'next-auth/react';
+import { signIn, getSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -20,6 +20,18 @@ export default function Login() {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     setIsDarkMode(prefersDark);
   }, []);
+
+  useEffect(() => {
+  // If the user is already logged in, redirect to home
+  const checkSession = async () => {
+    const session = await getSession();
+    if (session) {
+      router.push('/');
+    }
+  };
+  
+  checkSession();
+}, [router]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
